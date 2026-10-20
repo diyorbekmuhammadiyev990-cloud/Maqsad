@@ -280,7 +280,14 @@ document.getElementById("reportButton").onclick=()=>{
   (todays.length?Math.round(approved/todays.length*100):0)+"%.";
 };
 function updateReport(){}
-render();showTimer();showCard();
+ const MAQSAD_API_URL = "https://script.google.com/macros/s/AKfycbwC0cFiFLhjx1BUm_TEH5vwyUOt5OaREZuMjuONSGOq2DL0zgncqcef7Y9lDRtdaMC4HA/exec";
+
+function testMaqsadBackend() {
+  window.open(MAQSAD_API_URL, "_blank");
+}
+render();
+ showTimer();
+ showCard();
 </script>
 </body>
 </html>
