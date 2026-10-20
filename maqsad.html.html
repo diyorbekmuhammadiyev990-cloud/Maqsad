@@ -1,0 +1,287 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqsad — O‘quv rejalashtiruvchi</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;padding:20px;
+ background:#07152f;color:#f3f7ff;
+ font-family:Arial,sans-serif
+}
+.app{max-width:850px;margin:auto}
+header,.panel{
+ background:#102448;border:1px solid #27436e;
+ border-radius:18px;padding:18px;margin-bottom:16px
+}
+h1{color:#6dd8ff;margin:0}
+h2{font-size:19px}
+p{color:#b8c9e5;line-height:1.5}
+input,button{
+ padding:12px;border-radius:10px;font-size:15px
+}
+input{
+ background:#091a37;color:white;
+ border:1px solid #385681;min-width:0
+}
+button{
+ border:0;background:#4f8cff;color:white;
+ font-weight:bold;cursor:pointer
+}
+button.secondary{background:#233e68}
+.form{display:flex;gap:8px}
+.form input{flex:1;width:100%}
+.task{
+ background:#0a1b38;border:1px solid #29456f;
+ border-radius:12px;padding:13px;margin-top:10px
+}
+.task button{margin:8px 5px 0 0}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:#18345e;border-radius:12px;padding:14px}
+.stat strong{display:block;font-size:24px;margin-top:8px}
+.small{font-size:12px;color:#b8c9e5}
+#timer{font-size:42px;font-weight:bold;margin:15px 0}
+#preview{display:block;max-width:100%;max-height:220px;margin-top:10px}
+@media(max-width:550px){
+ body{padding:12px}.form{flex-direction:column}
+ .stats{gap:6px}.stat{padding:9px}
+ .stat strong{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+ <h1>🎯 Maqsad</h1>
+ <p>Har kuni maqsadingizga bir qadam!</p>
+ <div id="date"></div>
+</header>
+
+<section class="panel">
+ <h2>📊 Bugungi natija</h2>
+ <div class="stats">
+  <div class="stat">Vazifalar<strong id="total">0</strong></div>
+  <div class="stat">Bajarildi<strong id="done">0%</strong></div>
+  <div class="stat">Ballar ⭐<strong id="points">0</strong></div>
+ </div>
+</section>
+
+<section class="panel">
+ <h2>📝 Kunlik vazifalar</h2>
+ <form class="form" id="taskForm">
+  <input id="taskInput" placeholder="Yangi vazifani yozing..." required>
+  <button>+ Qo‘shish</button>
+ </form>
+ <div id="tasks"></div>
+ <p class="small">
+  Vazifa faqat administrator foto-isbotni tasdiqlagandan
+  keyin bajarilgan deb hisoblanishi kerak. Bu sinov
+  versiyasida haqiqiy administrator tasdig‘i hali ulanmagan.
+ </p>
+</section>
+
+<section class="panel">
+ <h2>📷 Foto-isbot</h2>
+ <p>Galereyadan yoki kameradan rasm tanlang.</p>
+ <input type="file" id="photo" accept="image/*" capture="environment">
+ <img id="preview" alt="Rasm ko‘rinishi">
+ <p id="photoStatus" class="small">Rasm hali tanlanmagan.</p>
+</section>
+
+<section class="panel">
+ <h2>⏱️ Pomodoro taymeri</h2>
+ <p>25 daqiqa diqqat bilan ishlang, so‘ng tanaffus qiling.</p>
+ <div id="timer">25:00</div>
+ <button id="start">Boshlash</button>
+ <button id="reset" class="secondary">Qayta boshlash</button>
+ <button id="break" class="secondary">5 daqiqa tanaffus</button>
+</section>
+
+<section class="panel">
+ <h2>🧠 Eslab qolish kartochkalari</h2>
+ <input id="question" placeholder="Savol">
+ <br><br>
+ <input id="answer" placeholder="Javob">
+ <br><br>
+ <button id="addCard">Kartochka qo‘shish</button>
+ <button id="showCard" class="secondary">Javobni ko‘rish</button>
+ <p id="cardText">Hozircha kartochka yo‘q.</p>
+</section>
+
+<section class="panel">
+ <h2>🌙 Kun yakuni hisoboti</h2>
+ <p id="report">Hozircha hisobot yo‘q.</p>
+ <button id="reportButton">Hisobotni ko‘rish</button>
+</section>
+</div>
+
+<script>
+const KEY="maqsad_tasks_v1";
+let tasks=[];
+let points=0;
+let cards=[];
+let cardIndex=0;
+let answerVisible=false;
+
+try{
+ const saved=JSON.parse(localStorage.getItem(KEY)||"{}");
+ tasks=saved.tasks||[];
+ points=saved.points||0;
+ cards=saved.cards||[];
+}catch(e){}
+
+const today=new Date().toLocaleDateString("en-CA");
+document.getElementById("date").textContent=
+ new Date().toLocaleDateString("uz-UZ",{
+  weekday:"long",day:"numeric",month:"long",year:"numeric"
+ });
+
+function save(){
+ localStorage.setItem(KEY,JSON.stringify({tasks,points,cards}));
+ render();
+}
+
+function render(){
+ const todays=tasks.filter(t=>t.date===today);
+ const approved=todays.filter(t=>t.status==="approved").length;
+ document.getElementById("total").textContent=todays.length;
+ document.getElementById("done").textContent=
+  (todays.length?Math.round(approved/todays.length*100):0)+"%";
+ document.getElementById("points").textContent=points;
+
+ const box=document.getElementById("tasks");
+ box.innerHTML="";
+ if(!todays.length){
+  box.textContent="Hozircha vazifa yo‘q. Birinchi vazifangizni qo‘shing!";
+ }
+ todays.forEach(t=>{
+  const div=document.createElement("div");
+  div.className="task";
+  const name=document.createElement("strong");
+  name.textContent=t.title;
+  const status=document.createElement("p");
+  status.textContent=
+   t.status==="approved"?"✅ Tasdiqlandi":
+   t.status==="pending"?"🕒 Foto yuborildi — tekshiruv kutilmoqda":
+   "📌 Bajarilmagan";
+  div.append(name,status);
+  if(t.status!=="approved"){
+   const proof=document.createElement("button");
+   proof.textContent="📷 Foto-isbot biriktirish";
+   proof.onclick=()=>{selectedTask=t.id;
+    document.getElementById("photo").click();};
+   div.append(proof);
+  }
+  const del=document.createElement("button");
+  del.textContent="O‘chirish";
+  del.className="secondary";
+  del.onclick=()=>{
+   tasks=tasks.filter(x=>x.id!==t.id);
+   save();
+  };
+  div.append(del);
+  box.append(div);
+ });
+ updateReport();
+}
+
+document.getElementById("taskForm").onsubmit=e=>{
+ e.preventDefault();
+ const input=document.getElementById("taskInput");
+ const title=input.value.trim();
+ if(!title)return;
+ tasks.push({
+  id:Date.now(),title,date:today,
+  status:"todo",photo:null
+ });
+ input.value="";
+ save();
+};
+
+let selectedTask=null;
+document.getElementById("photo").onchange=e=>{
+ const file=e.target.files[0];
+ if(!file)return;
+ if(!file.type.startsWith("image/")){
+  alert("Iltimos, rasm tanlang.");return;
+ }
+ if(file.size>2*1024*1024){
+  alert("2 MB dan kichikroq rasm tanlang.");return;
+ }
+ const reader=new FileReader();
+ reader.onload=()=>{
+  const task=tasks.find(t=>t.id===selectedTask);
+  if(!task)return;
+  task.photo=reader.result;
+  task.status="pending";
+  document.getElementById("preview").src=reader.result;
+  document.getElementById("photoStatus").textContent=
+   "Foto saqlandi. Administrator tasdig‘i kutilmoqda.";
+  save();
+ };
+ reader.readAsDataURL(file);
+};
+
+let seconds=25*60, interval=null;
+function showTimer(){
+ document.getElementById("timer").textContent=
+  String(Math.floor(seconds/60)).padStart(2,"0")+":"+
+  String(seconds%60).padStart(2,"0");
+}
+document.getElementById("start").onclick=()=>{
+ if(interval){
+  clearInterval(interval);interval=null;
+  document.getElementById("start").textContent="Davom ettirish";
+  return;
+ }
+ document.getElementById("start").textContent="Pauza";
+ interval=setInterval(()=>{
+  seconds--;showTimer();
+  if(seconds<=0){
+   clearInterval(interval);interval=null;
+   document.getElementById("start").textContent="Boshlash";
+   alert("Vaqt tugadi! Bir oz tanaffus qiling.");
+  }
+ },1000);
+};
+function setTimer(n){
+ clearInterval(interval);interval=null;seconds=n;showTimer();
+ document.getElementById("start").textContent="Boshlash";
+}
+document.getElementById("reset").onclick=()=>setTimer(25*60);
+document.getElementById("break").onclick=()=>setTimer(5*60);
+
+document.getElementById("addCard").onclick=()=>{
+ const q=document.getElementById("question").value.trim();
+ const a=document.getElementById("answer").value.trim();
+ if(!q||!a){alert("Savol va javobni kiriting.");return;}
+ cards.push({q,a});cardIndex=cards.length-1;
+ document.getElementById("question").value="";
+ document.getElementById("answer").value="";
+ answerVisible=false;save();showCard();
+};
+function showCard(){
+ const c=cards[cardIndex];
+ document.getElementById("cardText").textContent=
+  c?(answerVisible?c.a:c.q):"Hozircha kartochka yo‘q.";
+}
+document.getElementById("showCard").onclick=()=>{
+ if(!cards.length){alert("Avval kartochka qo‘shing.");return;}
+ answerVisible=!answerVisible;showCard();
+};
+document.getElementById("reportButton").onclick=()=>{
+ const todays=tasks.filter(t=>t.date===today);
+ const approved=todays.filter(t=>t.status==="approved").length;
+ document.getElementById("report").textContent=
+  "Bugun "+todays.length+" ta vazifa rejalashtirildi. "+
+  approved+" tasi tasdiqlandi. Bajarilish: "+
+  (todays.length?Math.round(approved/todays.length*100):0)+"%.";
+};
+function updateReport(){}
+render();showTimer();showCard();
+</script>
+</body>
+</html>
