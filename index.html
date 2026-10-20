@@ -187,17 +187,46 @@ function render(){
  updateReport();
 }
 
-document.getElementById("taskForm").onsubmit=e=>{
- e.preventDefault();
- const input=document.getElementById("taskInput");
- const title=input.value.trim();
- if(!title)return;
- tasks.push({
-  id:Date.now(),title,date:today,
-  status:"todo",photo:null
- });
- input.value="";
- save();
+
+document.getElementById("taskForm").onsubmit = async e => {
+  e.preventDefault();
+
+  const input = document.getElementById("taskInput");
+  const title = input.value.trim();
+  if (!title) return;
+
+  const task = {
+    id: Date.now(),
+    title,
+    date: today,
+    status: "todo",
+    photo: null
+  };
+
+  tasks.push(task);
+  input.value = "";
+  save();
+
+  try {
+    await fetch(MAQSAD_API_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        action: "saveTask",
+        userId: "local-user",
+        title: task.title,
+        date: task.date,
+        description: ""
+      })
+    });
+  } catch (error) {
+    console.error("Backendga yuborishda xatolik:", error);
+  }
+};
+
 };
 
 let selectedTask=null;
